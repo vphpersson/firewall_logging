@@ -6,7 +6,7 @@ toolchain go1.24.3
 
 require (
 	github.com/Motmedel/ecs_go v0.0.63
-	github.com/florianl/go-nflog/v2 v2.1.0
+	github.com/florianl/go-nflog/v2 v2.1.1-0.20250403073945-ae5e7f00bd3a
 	github.com/gopacket/gopacket v1.3.1
 	github.com/vphpersson/packet_logging v0.0.3
 )
