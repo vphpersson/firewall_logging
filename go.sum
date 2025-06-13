@@ -17,8 +17,8 @@ github.com/mdlayher/netlink v1.6.0 h1:rOHX5yl7qnlpiVkFWoqccueppMtXzeziFjWAjLg6sz
 github.com/mdlayher/netlink v1.6.0/go.mod h1:0o3PlBmGst1xve7wQ7j/hwpNaFaH4qCRyWCdcZk8/vA=
 github.com/mdlayher/socket v0.1.1 h1:q3uOGirUPfAV2MUoaC7BavjQ154J7+JOkTWyiV+intI=
 github.com/mdlayher/socket v0.1.1/go.mod h1:mYV5YIZAfHh4dzDVzI8x8tWLWCliuX8Mon5Awbj+qDs=
-github.com/vphpersson/packet_logging v0.0.2 h1:78Q2tgEL2hW+5F80iQKgI4QLbXbbraQUFr6RvaAcZVA=
-github.com/vphpersson/packet_logging v0.0.2/go.mod h1:TEF64wGIAxqEEkxRe5kAnyomcjLWbk3To4iTOVETGY0=
+github.com/vphpersson/packet_logging v0.0.3 h1:Fa2+yLACGBhk4ht+Q2S7gCC8+5snly1+gV5h5Mh+B6o=
+github.com/vphpersson/packet_logging v0.0.3/go.mod h1:MbNXq6eF3f8t0IbI53FKxcy1fRzTb+oE+E+sxuProjg=
 golang.org/x/net v0.0.0-20210928044308-7d9f5e0b762b/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd/go.mod h1:CfG3xpIq0wQ8r1q4Su4UZFWDARRcnwPjda9FqA0JpMk=
 golang.org/x/net v0.40.0 h1:79Xs7wF06Gbdcg4kdCCIQArK11Z1hr5POQ6+fIYHNuY=

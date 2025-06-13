@@ -124,22 +124,14 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 			switch hookName {
 			case "input":
 				if ingressInterfaceName != "" {
-					ruleRuleset = fmt.Sprintf(
-						"%s_%s",
-						strings.ToUpper(hookName),
-						strings.ToUpper(ingressInterfaceName),
-					)
+					ruleRuleset = fmt.Sprintf("%s_%s", hookName, ingressInterfaceName)
 				}
 			case "output":
 				if egressInterfaceName != "" {
-					ruleRuleset = fmt.Sprintf(
-						"%s_%s",
-						strings.ToUpper(hookName),
-						strings.ToUpper(egressInterfaceName),
-					)
+					ruleRuleset = fmt.Sprintf("%s_%s", hookName, egressInterfaceName)
 				}
 			case "prerouting", "forward", "postrouting":
-				ruleRuleset = strings.ToUpper(hookName)
+				ruleRuleset = hookName
 			}
 
 			ruleName = prefixStringSplit[0]
