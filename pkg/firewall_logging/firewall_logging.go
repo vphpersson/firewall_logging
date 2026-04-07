@@ -2,15 +2,17 @@ package firewall_logging
 
 import (
 	"fmt"
-	"github.com/Motmedel/ecs_go/ecs"
-	"github.com/florianl/go-nflog/v2"
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
-	"github.com/vphpersson/packet_logging/pkg/packet_logging"
 	"net"
 	"os/user"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/Motmedel/utils_go/pkg/schema"
+	"github.com/florianl/go-nflog/v2"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/vphpersson/packet_logging/pkg/packet_logging"
 )
 
 const (
@@ -20,7 +22,7 @@ const (
 	ActionUnknown = "unknown"
 )
 
-var netfilterHookIdToName = map[int]string{
+var netfilterHookIdToName = map[uint8]string{
 	0: "prerouting",
 	1: "input",
 	2: "forward",
@@ -28,27 +30,22 @@ var netfilterHookIdToName = map[int]string{
 	4: "postrouting",
 }
 
-func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
-	if nflogAttribute == nil {
+func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base) {
+	if nflogAttribute == nil || base == nil {
 		return
 	}
 
-	if base == nil {
-		return
+	if timestamp := nflogAttribute.Timestamp; timestamp != nil {
+		base.Timestamp = timestamp.UTC().Format(time.RFC3339Nano)
 	}
 
-	timestamp := nflogAttribute.Timestamp
-	if timestamp != nil {
-		base.Timestamp = timestamp.UTC().Format("2006-01-02T15:04:05.999999Z")
-	}
-
-	payload := nflogAttribute.Payload
-	if payload != nil && len(*payload) != 0 {
-		packet := gopacket.NewPacket(*payload, layers.LayerTypeIPv4, gopacket.Default)
-		if ipv4Layer := packet.Layer(layers.LayerTypeIPv4); ipv4Layer == nil {
-			packet = gopacket.NewPacket(*payload, layers.LayerTypeIPv6, gopacket.Default)
+	if payload := nflogAttribute.Payload; payload != nil && len(*payload) != 0 {
+		layerType := layers.LayerTypeIPv4
+		if (*payload)[0]>>4 == 6 {
+			layerType = layers.LayerTypeIPv6
 		}
 
+		packet := gopacket.NewPacket(*payload, layerType, gopacket.Default)
 		for _, layer := range packet.Layers() {
 			packet_logging.EnrichFromLayer(base, layer, packet)
 		}
@@ -56,14 +53,14 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 
 	ecsObserver := base.Observer
 	if ecsObserver == nil {
-		ecsObserver = &ecs.Observer{}
+		ecsObserver = &schema.Observer{}
 	}
 
 	hook := nflogAttribute.Hook
 	var hookName string
 	if hook != nil {
 		var ok bool
-		if hookName, ok = netfilterHookIdToName[int(*hook)]; ok {
+		if hookName, ok = netfilterHookIdToName[*hook]; ok {
 			ecsObserver.Hook = hookName
 		}
 	}
@@ -74,7 +71,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 	var ingressInterfaceName string
 	if inDev := nflogAttribute.InDev; inDev != nil {
 		if ecsObserverIngress == nil {
-			ecsObserverIngress = &ecs.ObserverIngressEgress{}
+			ecsObserverIngress = &schema.ObserverIngressEgress{}
 			ecsObserver.Ingress = ecsObserverIngress
 		}
 
@@ -85,13 +82,13 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 			ingressInterfaceName = networkInterface.Name
 		}
 
-		ecsObserverIngress.Interface = &ecs.Interface{Id: strconv.Itoa(int(*inDev)), Name: ingressInterfaceName}
+		ecsObserverIngress.Interface = &schema.Interface{Id: strconv.Itoa(inDevInt), Name: ingressInterfaceName}
 	}
 
 	var egressInterfaceName string
 	if outDev := nflogAttribute.OutDev; outDev != nil {
 		if ecsObserverEgress == nil {
-			ecsObserverEgress = &ecs.ObserverIngressEgress{}
+			ecsObserverEgress = &schema.ObserverIngressEgress{}
 			ecsObserver.Egress = ecsObserverEgress
 		}
 
@@ -102,10 +99,10 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 			egressInterfaceName = networkInterface.Name
 		}
 
-		ecsObserverEgress.Interface = &ecs.Interface{Id: strconv.Itoa(int(*outDev)), Name: egressInterfaceName}
+		ecsObserverEgress.Interface = &schema.Interface{Id: strconv.Itoa(outDevInt), Name: egressInterfaceName}
 	}
 
-	if ecsObserverIngress != nil || ecsObserverEgress != nil {
+	if hook != nil || ecsObserverIngress != nil || ecsObserverEgress != nil {
 		base.Observer = ecsObserver
 	}
 
@@ -125,10 +122,14 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 			case "input":
 				if ingressInterfaceName != "" {
 					ruleRuleset = fmt.Sprintf("%s_%s", hookName, ingressInterfaceName)
+				} else {
+					ruleRuleset = hookName
 				}
 			case "output":
 				if egressInterfaceName != "" {
 					ruleRuleset = fmt.Sprintf("%s_%s", hookName, egressInterfaceName)
+				} else {
+					ruleRuleset = hookName
 				}
 			case "prerouting", "forward", "postrouting":
 				ruleRuleset = hookName
@@ -145,7 +146,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 		if ruleName != "" || ruleRuleset != "" {
 			ecsRule := base.Rule
 			if ecsRule == nil {
-				ecsRule = &ecs.Rule{}
+				ecsRule = &schema.Rule{}
 				base.Rule = ecsRule
 			}
 
@@ -172,7 +173,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 		if eventAction != "" || eventType != "" {
 			ecsEvent := base.Event
 			if ecsEvent == nil {
-				ecsEvent = &ecs.Event{}
+				ecsEvent = &schema.Event{}
 				base.Event = ecsEvent
 			}
 
@@ -190,7 +191,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 	if userId != nil {
 		ecsUser := base.User
 		if ecsUser == nil {
-			ecsUser = &ecs.User{}
+			ecsUser = &schema.User{}
 			base.User = ecsUser
 		}
 
@@ -207,7 +208,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *ecs.Base) {
 	if groupId != nil {
 		ecsGroup := base.Group
 		if ecsGroup == nil {
-			ecsGroup = &ecs.Group{}
+			ecsGroup = &schema.Group{}
 			base.Group = ecsGroup
 		}
 
