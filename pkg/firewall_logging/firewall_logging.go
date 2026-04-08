@@ -154,20 +154,24 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 			ecsRule.Name = ruleName
 		}
 
-		eventAction, eventType := "", ""
+		eventAction, eventType, eventOutcome := "", "", ""
 		switch actionCode {
 		case "A":
 			eventAction = ActionAccept
 			eventType = "allowed"
+			eventOutcome = "success"
 		case "D":
 			eventAction = ActionDrop
 			eventType = "denied"
+			eventOutcome = "failure"
 		case "R":
 			eventAction = ActionReject
 			eventType = "denied"
+			eventOutcome = "failure"
 		case "U":
 			eventAction = ActionUnknown
 			eventType = ""
+			eventOutcome = "unknown"
 		}
 
 		if eventAction != "" || eventType != "" {
@@ -182,8 +186,11 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 				eventTypeSlice = append(eventTypeSlice, eventType)
 			}
 
+			ecsEvent.Kind = "event"
+			ecsEvent.Category = []string{"network"}
 			ecsEvent.Action = eventAction
 			ecsEvent.Type = eventTypeSlice
+			ecsEvent.Outcome = eventOutcome
 		}
 	}
 
