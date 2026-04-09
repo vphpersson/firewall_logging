@@ -3,7 +3,7 @@ module github.com/vphpersson/firewall_logging
 go 1.25.0
 
 require (
-	github.com/Motmedel/utils_go v0.0.456
+	github.com/Motmedel/utils_go v0.0.461
 	github.com/florianl/go-nflog/v2 v2.3.0
 	github.com/gopacket/gopacket v1.5.0
 	github.com/vphpersson/packet_logging v0.0.4
