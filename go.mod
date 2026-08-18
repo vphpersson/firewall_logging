@@ -3,7 +3,7 @@ module github.com/vphpersson/firewall_logging
 go 1.26.0
 
 require (
-	github.com/altshiftab/utils_go v1.23.1
+	github.com/altshiftab/utils_go v1.23.2
 	github.com/florianl/go-nflog/v2 v2.3.0
 	github.com/gopacket/gopacket v1.7.1
 	github.com/mdlayher/netlink v1.11.2

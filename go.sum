@@ -1,5 +1,5 @@
-github.com/altshiftab/utils_go v1.23.1 h1:zMbWKFfQ//3buaBSVNnaYW6ZHOcKbII45l649/uDleA=
-github.com/altshiftab/utils_go v1.23.1/go.mod h1:VSr1HgvPdUxUV9Y97SfmxANI27QMZ6V1co3/pDlZ8A8=
+github.com/altshiftab/utils_go v1.23.2 h1:ouiFKg9UOOkKTII5Y7hnWdPY4ej9colxak89JgKaKOw=
+github.com/altshiftab/utils_go v1.23.2/go.mod h1:VSr1HgvPdUxUV9Y97SfmxANI27QMZ6V1co3/pDlZ8A8=
 github.com/florianl/go-nflog/v2 v2.3.0 h1:mghOcw09/XPs9dEoR1ffKPNC/tsNRCuhq/2BTz2GRjQ=
 github.com/florianl/go-nflog/v2 v2.3.0/go.mod h1:ob11SI7TLgZJVZj356/kiD5DtTzKLw/caENAKeVSgSM=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
