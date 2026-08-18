@@ -2,13 +2,11 @@ package firewall_logging
 
 import (
 	"fmt"
-	"net"
-	"os/user"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Motmedel/utils_go/pkg/schema"
+	"github.com/altshiftab/utils_go/pkg/schema"
 	"github.com/florianl/go-nflog/v2"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -47,7 +45,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 
 		packet := gopacket.NewPacket(*payload, layerType, gopacket.Default)
 		for _, layer := range packet.Layers() {
-			packet_logging.EnrichFromLayer(base, layer, packet)
+			packet_logging.EnrichFromLayer(base, layer)
 		}
 	}
 
@@ -76,11 +74,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 		}
 
 		inDevInt := int(*inDev)
-
-		networkInterface, _ := net.InterfaceByIndex(inDevInt)
-		if networkInterface != nil {
-			ingressInterfaceName = networkInterface.Name
-		}
+		ingressInterfaceName = interfaceNameCache.get(inDevInt)
 
 		ecsObserverIngress.Interface = &schema.Interface{Id: strconv.Itoa(inDevInt), Name: ingressInterfaceName}
 	}
@@ -93,11 +87,7 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 		}
 
 		outDevInt := int(*outDev)
-
-		networkInterface, _ := net.InterfaceByIndex(outDevInt)
-		if networkInterface != nil {
-			egressInterfaceName = networkInterface.Name
-		}
+		egressInterfaceName = interfaceNameCache.get(outDevInt)
 
 		ecsObserverEgress.Interface = &schema.Interface{Id: strconv.Itoa(outDevInt), Name: egressInterfaceName}
 	}
@@ -116,8 +106,10 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 
 		prefixStringSplit := strings.Split(prefixString, "-")
 
-		switch len(prefixStringSplit) {
-		case 2:
+		switch {
+		case len(prefixStringSplit) < 2:
+			// A prefix without an action code carries nothing to record.
+		case len(prefixStringSplit) == 2:
 			switch hookName {
 			case "input":
 				if ingressInterfaceName != "" {
@@ -137,10 +129,14 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 
 			ruleName = prefixStringSplit[0]
 			actionCode = prefixStringSplit[1]
-		case 3:
+		default:
+			// The ruleset is the first field and the action code the last, so
+			// everything between them belongs to the rule name, which may
+			// therefore contain hyphens of its own.
+			lastIndex := len(prefixStringSplit) - 1
 			ruleRuleset = prefixStringSplit[0]
-			ruleName = prefixStringSplit[1]
-			actionCode = prefixStringSplit[2]
+			ruleName = strings.Join(prefixStringSplit[1:lastIndex], "-")
+			actionCode = prefixStringSplit[lastIndex]
 		}
 
 		if ruleName != "" || ruleRuleset != "" {
@@ -204,10 +200,8 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 
 		userIdString := strconv.Itoa(int(*userId))
 		ecsUser.Id = userIdString
-
-		lookupUser, _ := user.LookupId(userIdString)
-		if lookupUser != nil {
-			ecsUser.Name = lookupUser.Username
+		if userName := userNameCache.get(userIdString); userName != "" {
+			ecsUser.Name = userName
 		}
 	}
 
@@ -221,10 +215,8 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 
 		groupIdString := strconv.Itoa(int(*groupId))
 		ecsGroup.Id = groupIdString
-
-		lookupGroup, _ := user.LookupGroupId(groupIdString)
-		if lookupGroup != nil {
-			ecsGroup.Name = lookupGroup.Name
+		if groupName := groupNameCache.get(groupIdString); groupName != "" {
+			ecsGroup.Name = groupName
 		}
 	}
 }

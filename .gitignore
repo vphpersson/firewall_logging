@@ -1,7 +1,15 @@
 *
+!/.dockerignore
 !/.gitignore
+!/Dockerfile
+!/Makefile
 !/go.mod
 !/go.sum
+
+!/cmd/
+!/cmd/firewall_logging_service/
+!/cmd/firewall_logging_service/main.go
+!/cmd/firewall_logging_service/main_test.go
 
 !/pkg
 
