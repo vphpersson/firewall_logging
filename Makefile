@@ -1,7 +1,6 @@
 BINARY   := firewall_logging_service
 IMAGE    := firewall_logging
 REGISTRY := registry.home.arpa
-GO_ENV   := GOEXPERIMENT=jsonv2
 
 .PHONY: all update build test fmt vet image publish clean
 
@@ -12,16 +11,16 @@ update:
 	gm
 
 build:
-	$(GO_ENV) CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BINARY) ./cmd/firewall_logging_service
+	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BINARY) ./cmd/firewall_logging_service
 
 test:
-	$(GO_ENV) go test ./...
+	go test ./...
 
 fmt:
 	gofmt -w .
 
 vet:
-	$(GO_ENV) go vet ./...
+	go vet ./...
 
 image:
 	podman build -t $(IMAGE) .

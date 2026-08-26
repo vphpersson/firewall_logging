@@ -1,6 +1,6 @@
 module github.com/vphpersson/firewall_logging
 
-go 1.26.0
+go 1.27
 
 require (
 	github.com/altshiftab/utils_go v1.23.2
