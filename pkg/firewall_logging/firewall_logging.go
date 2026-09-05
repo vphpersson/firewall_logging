@@ -2,6 +2,7 @@ package firewall_logging
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -20,12 +21,36 @@ const (
 	ActionUnknown = "unknown"
 )
 
+// From enum ip_conntrack_info in linux/netfilter/nf_conntrack_common.h. The
+// reply values are the forward ones plus IP_CT_IS_REPLY (3), which is why
+// established_reply and IP_CT_IS_REPLY share the value 3.
+var conntrackInfoToState = map[uint32]string{
+	0: "established",
+	1: "related",
+	2: "new",
+	3: "established_reply",
+	4: "related_reply",
+}
+
+const netfilterHookPostrouting = "postrouting"
+
 var netfilterHookIdToName = map[uint8]string{
 	0: "prerouting",
 	1: "input",
 	2: "forward",
 	3: "output",
 	4: "postrouting",
+}
+
+// nftables returns the custom nftables object on base, creating it on first
+// use. Several unrelated attributes populate it, and each would otherwise
+// repeat the same nil check.
+func nftables(base *schema.Base) *schema.Nftables {
+	if base.Nftables == nil {
+		base.Nftables = &schema.Nftables{}
+	}
+
+	return base.Nftables
 }
 
 func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base) {
@@ -57,9 +82,9 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 	hook := nflogAttribute.Hook
 	var hookName string
 	if hook != nil {
-		var ok bool
-		if hookName, ok = netfilterHookIdToName[*hook]; ok {
-			ecsObserver.Hook = hookName
+		if name, ok := netfilterHookIdToName[*hook]; ok {
+			hookName = name
+			nftables(base).Hook = hookName
 		}
 	}
 
@@ -92,8 +117,64 @@ func EnrichWithNflogAttribute(nflogAttribute *nflog.Attribute, base *schema.Base
 		ecsObserverEgress.Interface = &schema.Interface{Id: strconv.Itoa(outDevInt), Name: egressInterfaceName}
 	}
 
-	if hook != nil || ecsObserverIngress != nil || ecsObserverEgress != nil {
+	if ecsObserverIngress != nil || ecsObserverEgress != nil {
 		base.Observer = ecsObserver
+	}
+
+	// The frame's own source address, recorded as-is. It is the previous hop,
+	// which is what NFULA_HWADDR means, and it is kept unconditionally because
+	// the cases the on-link test below rejects are often the ones where it
+	// matters most: a station spoofing another subnet, a DHCP client sending
+	// from 0.0.0.0, a link-local or self-assigned host.
+	if hardwareAddress := nflogAttribute.HwAddr; hardwareAddress != nil && len(*hardwareAddress) != 0 {
+		frameAddress := net.HardwareAddr(*hardwareAddress).String()
+		nftables(base).HwAddr = frameAddress
+
+		// source.mac additionally claims the frame's sender IS the packet's
+		// source, which holds only when that source is on the segment the
+		// packet arrived on. Routed traffic carries the upstream router's
+		// address, identical for every packet regardless of origin.
+		//
+		// Postrouting is excluded: it runs after srcnat, so base.Source.Ip may
+		// be a NAT-rewritten address that happens to fall inside the ingress
+		// prefix -- hairpin NAT would otherwise pair the client's MAC with the
+		// firewall's own address.
+		if inDev := nflogAttribute.InDev; inDev != nil && hookName != netfilterHookPostrouting {
+			if ecsSource := base.Source; ecsSource != nil && ecsSource.Ip != "" {
+				if sourceIsOnLink(int(*inDev), net.ParseIP(ecsSource.Ip)) {
+					ecsSource.Mac = frameAddress
+				}
+			}
+		}
+	}
+
+	// nflog's per-group sequence number. Gaps mean messages from this group were
+	// lost between the kernel and here, which is otherwise silent. SeqGlobal
+	// counts every group on the host, so a gap there need not be ours.
+	if sequence := nflogAttribute.Seq; sequence != nil {
+		ecsEvent := base.Event
+		if ecsEvent == nil {
+			ecsEvent = &schema.Event{}
+			base.Event = ecsEvent
+		}
+
+		ecsEvent.Sequence = int(*sequence)
+	}
+
+	// What conntrack made of the packet as the rule logged it. The rule naming
+	// convention asserts this ("...-new-A"); recording it makes the assertion
+	// checkable instead.
+	if conntrackInfo := nflogAttribute.CtInfo; conntrackInfo != nil {
+		if state, ok := conntrackInfoToState[*conntrackInfo]; ok {
+			nftables(base).ConntrackState = state
+		}
+	}
+
+	// The nftables packet mark, which can decide routing without appearing
+	// anywhere else in the log.
+	if mark := nflogAttribute.Mark; mark != nil {
+		markValue := *mark
+		nftables(base).Mark = &markValue
 	}
 
 	prefix := nflogAttribute.Prefix

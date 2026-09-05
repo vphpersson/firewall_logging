@@ -268,3 +268,21 @@ func TestNewLoggerWritesJson(t *testing.T) {
 		}
 	}
 }
+
+// TestNflogConfigIsAccepted opens a connection with the same Config the service
+// uses. go-nflog validates Flags with a magnitude comparison rather than a mask
+// (checkFlags: `flags > FlagConntrack`), so a combination the kernel accepts can
+// still be refused by the library -- and the service treats that as fatal, so it
+// would die at startup on every host. Opening the socket needs no privileges.
+func TestNflogConfigIsAccepted(t *testing.T) {
+	t.Parallel()
+
+	handler, err := nflog.Open(nflogConfig(0))
+	if err != nil {
+		t.Fatalf("the service's own nflog config was rejected: %v", err)
+	}
+
+	if err := handler.Close(); err != nil {
+		t.Errorf("closing the handler failed: %v", err)
+	}
+}

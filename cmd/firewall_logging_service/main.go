@@ -112,6 +112,26 @@ func makeDocument(attribute *nflog.Attribute, timestamp time.Time) *schema.Base 
 	return document
 }
 
+// nflogConfig is the connection the service opens, factored out so a test can
+// assert the library accepts it.
+//
+// Flags matter: without them the kernel omits the attributes entirely. Only one
+// can be set here, because go-nflog validates with `flags > FlagConntrack`
+// rather than a bitmask, so FlagSeq|FlagConntrack (5) is refused even though
+// the kernel accepts both bits. FlagConntrack wins: the connection state makes
+// the "-new-" claim in every accept rule's log prefix checkable, where FlagSeq
+// would only reveal messages lost between the kernel and here.
+//
+// FlagConntrack needs CONFIG_NETFILTER_NETLINK_GLUE_CT; where that is missing
+// the attribute is simply absent, which the enrichment tolerates.
+func nflogConfig(group uint16) *nflog.Config {
+	return &nflog.Config{
+		Group:    group,
+		Copymode: nflog.CopyPacket,
+		Flags:    nflog.FlagConntrack,
+	}
+}
+
 func main() {
 	logger := newLogger(os.Stdout)
 	slog.SetDefault(logger.Logger)
@@ -132,7 +152,7 @@ func main() {
 		os.Exit(exitError)
 	}
 
-	netfilterLogHandler, err := nflog.Open(&nflog.Config{Group: group, Copymode: nflog.CopyPacket})
+	netfilterLogHandler, err := nflog.Open(nflogConfig(group))
 	if err != nil {
 		logger.FatalWithExitingMessage(
 			"An error occurred when opening a connection to the Netfilter log system",

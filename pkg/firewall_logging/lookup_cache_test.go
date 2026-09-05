@@ -8,12 +8,12 @@ import (
 
 // newTestCache builds a cache whose clock is driven by the returned pointer and
 // which counts how many times the underlying lookup actually ran.
-func newTestCache(values map[string]string) (*lookupCache[string], *time.Time, *int) {
+func newTestCache(values map[string]string) (*lookupCache[string, string], *time.Time, *int) {
 	now := time.Date(2026, 8, 18, 12, 0, 0, 0, time.UTC)
 	calls := 0
 
-	cache := &lookupCache[string]{
-		entries: make(map[string]cacheEntry),
+	cache := &lookupCache[string, string]{
+		entries: make(map[string]cacheEntry[string]),
 		ttl:     time.Minute,
 		now:     func() time.Time { return now },
 		resolve: func(key string) string {
